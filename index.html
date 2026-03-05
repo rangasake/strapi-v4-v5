@@ -1,32 +1,735 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Strapi v4 → v5 Migration Tool</title>
-<link rel="stylesheet" href="/styles.css">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Strapi GraphQL Migrator — v4 → v5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f;--s1:#0d1018;--s2:#111420;--b1:#1c1f2e;--b2:#252840;
+  --tx:#d8dff0;--mt:#5a6080;--dm:#2a2d40;
+  --ac:#5b6ef5;--ac2:#7c3aed;
+  --green:#34d399;--red:#f87171;--yellow:#fbbf24;--blue:#60a5fa;
+  --mono:'IBM Plex Mono',monospace;--display:'Syne',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--tx);font-family:var(--mono);font-size:13px;min-height:100vh;padding:36px 24px 60px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--dm);border-radius:3px}
+.wrap{max-width:1240px;margin:0 auto}
+/* header */
+.hdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:28px}
+.logo{width:44px;height:44px;flex-shrink:0;border-radius:12px;background:linear-gradient(135deg,var(--ac),var(--ac2));display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 28px rgba(91,110,245,.3)}
+.hdr h1{font-family:var(--display);font-size:23px;font-weight:800;letter-spacing:-.03em;background:linear-gradient(90deg,#d8dff0,#7c8ab8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:5px}
+.badge{display:inline-flex;align-items:center;background:rgba(91,110,245,.12);border:1px solid rgba(91,110,245,.3);border-radius:20px;padding:2px 10px;font-size:10px;color:var(--ac);font-weight:600;letter-spacing:.06em;margin-left:7px;vertical-align:middle}
+.badge.green{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:var(--green)}
+.badge.yellow{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:var(--yellow)}
+.hdr p{font-size:12px;color:var(--mt);line-height:1.7}
+/* tabs */
+.tabs{display:flex;gap:4px;margin-bottom:0;border-bottom:1px solid var(--b1);padding-bottom:0}
+.tab{padding:8px 18px;border-radius:8px 8px 0 0;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;border:1px solid transparent;border-bottom:none;color:var(--mt);background:transparent;transition:all .15s;position:relative;bottom:-1px}
+.tab.active{background:var(--s1);border-color:var(--b1);border-bottom-color:var(--s1);color:var(--tx)}
+.tab:hover:not(.active){color:var(--tx)}
+.tab-content{padding-top:16px}
+/* panels */
+.panel{background:var(--s1);border:1px solid var(--b1);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.phead{background:var(--s2);border-bottom:1px solid var(--b1);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.phead-lbl{font-size:11px;color:var(--mt)}
+.pfoot{background:var(--s2);border-top:1px solid var(--b1);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+textarea.ci{width:100%;background:transparent;border:none;padding:14px 16px;color:#8a98c4;font-family:var(--mono);font-size:12px;line-height:1.75;resize:vertical;outline:none}
+textarea.ci::placeholder{color:var(--dm)}
+/* buttons */
+.btn-primary{background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;border-radius:8px;padding:8px 22px;color:#fff;font-family:var(--mono);font-weight:600;font-size:13px;cursor:pointer;transition:opacity .2s,transform .1s;display:flex;align-items:center;gap:7px}
+.btn-primary:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-ghost{background:transparent;border:1px solid var(--b2);border-radius:6px;padding:3px 11px;color:var(--mt);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .15s}
+.btn-ghost:hover{border-color:var(--ac);color:var(--ac)}
+.btn-copy{background:transparent;border:1px solid var(--b2);border-radius:5px;padding:3px 10px;color:var(--mt);font-family:var(--mono);font-size:10px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .15s}
+.btn-copy:hover,.btn-copy.ok{border-color:var(--green);color:var(--green)}
+.btn-copyall{background:var(--s2);border:1px solid var(--b2);border-radius:6px;padding:4px 13px;color:var(--mt);font-family:var(--mono);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
+.btn-copyall:hover,.btn-copyall.ok{border-color:var(--green);color:var(--green)}
+/* progress */
+#progwrap{margin-bottom:16px;display:none}
+.prog-info{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+#progtrack{height:3px;background:var(--dm);border-radius:2px;overflow:hidden}
+#progbar{height:100%;width:0%;background:linear-gradient(90deg,var(--ac),var(--ac2));border-radius:2px;transition:width .25s ease}
+#progbar.done{background:var(--green)}
+/* cards */
+#gql-results{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden;animation:fi .2s ease}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.card.done{border-color:#1a3326}.card.err{border-color:#3a1a1a}
+.chead{background:var(--s2);border-bottom:1px solid var(--b1);padding:9px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.card.done .chead{background:#0b1e16}.card.err .chead{background:#1e0b0b}
+.ctitle{display:flex;align-items:center;gap:9px}
+.cname{font-size:12px;color:var(--tx);font-weight:600}
+.cbody{display:grid;grid-template-columns:1fr 1fr}
+.cpane{padding:12px 14px}
+.cpane:first-child{border-right:1px solid var(--b1)}
+.plbl{font-size:9px;font-weight:700;letter-spacing:.1em;margin-bottom:8px}
+.plbl-v4{color:var(--red)}.plbl-v5{color:var(--green)}
+.cpane pre{margin:0;font-family:var(--mono);font-size:11.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.pane-v4 pre{color:#7a8ab0}.pane-v5 pre{color:#86efac}
+.warn-tag{font-size:10px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:4px;padding:2px 7px;color:var(--yellow)}
+/* js output */
+.js-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.jspanel{background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden}
+.jspanel.done{border-color:#1a3326}.jspanel.err{border-color:#3a1a1a}
+.jspanel-head{background:var(--s2);border-bottom:1px solid var(--b1);padding:9px 14px;display:flex;justify-content:space-between;align-items:center}
+.jspanel pre{padding:14px;font-family:var(--mono);font-size:11.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:520px;overflow-y:auto;color:#7a8ab0}
+.jspanel.done pre{color:#86efac}
+/* legend */
+.legend{margin-top:24px;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:16px 18px}
+.leg-title{font-size:10px;color:var(--mt);font-weight:600;letter-spacing:.08em;margin-bottom:10px}
+.leg-grid{display:flex;flex-wrap:wrap;gap:8px 28px}
+.leg-item{font-size:11px;display:flex;align-items:center;gap:6px}
+.v4k{color:#f97316}.v5k{color:var(--green)}.arr{color:var(--dm)}
+.manual{margin-top:12px;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:12px 16px}
+.manual-title{font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:8px}
+.manual ul{list-style:none;display:flex;flex-direction:column;gap:5px}
+.manual li{font-size:11px;color:#b0a060;display:flex;gap:8px}
+.manual li::before{content:'→';color:var(--yellow);flex-shrink:0}
+.hidden{display:none!important}
+.lbl{font-size:11px;color:var(--mt)}
+@media(max-width:700px){.cbody,.js-grid{grid-template-columns:1fr}.cpane:first-child{border-right:none;border-bottom:1px solid var(--b1)}body{padding:20px 12px 40px}}
+</style>
 </head>
-
 <body>
+<div class="wrap">
 
-<div class="wrapper">
+<div class="hdr">
+  <div class="logo">⚡</div>
+  <div>
+    <h1>Strapi GraphQL Migrator
+      <span class="badge">v4 → v5</span>
+      <span class="badge green">Offline</span>
+      <span class="badge yellow">+ status</span>
+    </h1>
+    <p>Convert GQL queries <b>and</b> JS response code · Auto-injects <code style="color:#fbbf24">status: DRAFT</code> · No API key · Fully offline</p>
+  </div>
+</div>
 
-<h1 class="title">Strapi v4 → v5 Migration Tool</h1>
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('gql')">📄 GraphQL Queries</button>
+  <button class="tab" onclick="switchTab('js')">⚙️ JS Function (Query + Response)</button>
+</div>
 
-<div class="cards">
+<!-- TAB GQL -->
+<div id="tab-gql" class="tab-content">
+  <div class="panel">
+    <div class="phead">
+      <span class="phead-lbl">Paste v4 GraphQL queries — separate multiple with <code style="color:#94a3b8"># ---</code> on its own line</span>
+      <button class="btn-ghost" onclick="loadGQLEx()">Load Example</button>
+    </div>
+    <textarea class="ci" id="gql-inp" rows="12" oninput="updateGQLCount()"
+      placeholder="query GetHotels {&#10;  hotels {&#10;    data {&#10;      id&#10;      attributes { HotelName Slug }&#10;    }&#10;    meta { pagination { total page pageSize pageCount } }&#10;  }&#10;}"></textarea>
+    <div class="pfoot">
+      <span class="lbl" id="gql-count">No queries detected</span>
+      <button class="btn-primary" id="gql-btn" onclick="convertAllGQL()" disabled>⚡ Convert to v5 + status</button>
+    </div>
+  </div>
+  <div id="progwrap">
+    <div class="prog-info">
+      <span class="lbl" id="proglbl">Converting...</span>
+      <button class="btn-copyall" id="copyallbtn" onclick="copyAllGQL()" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy All v5
+      </button>
+    </div>
+    <div id="progtrack"><div id="progbar"></div></div>
+  </div>
+  <div id="gql-results"></div>
+</div>
 
-<a href="query-convert.html" class="card">
-<h2>Only Query Convert</h2>
-<p>Convert Strapi v4 GraphQL queries into Strapi v5 format.</p>
-</a>
+<!-- TAB JS -->
+<div id="tab-js" class="tab-content hidden">
+  <div class="panel">
+    <div class="phead">
+      <span class="phead-lbl">Paste your full JS/TS function — with <code style="color:#94a3b8">gql`...`</code> query <b>and</b> <code style="color:#94a3b8">.then()</code> response mapping</span>
+      <button class="btn-ghost" onclick="loadJSEx()">Load Example (from your file)</button>
+    </div>
+    <textarea class="ci" id="js-inp" rows="18" oninput="updateJSBtn()"
+      placeholder="export const getHotelDetails = async (hotelId) => {&#10;  return await client.query({&#10;    query: gql`...`,&#10;  }).then((res) => {&#10;    return res?.data?.hotels?.data ? { ... } : null;&#10;  });&#10;};"></textarea>
+    <div class="pfoot">
+      <span class="lbl" id="js-lbl">Paste a JS function above</span>
+      <button class="btn-primary" id="js-btn" onclick="doConvertJS()" disabled>⚡ Convert Query + Response</button>
+    </div>
+  </div>
+  <div id="js-out"></div>
+</div>
 
-<a href="query-response-convert.html" class="card">
-<h2>Query + Response Convert</h2>
-<p>Convert GraphQL queries and update response handling.</p>
-</a>
-
+<!-- legend -->
+<div class="legend">
+  <div class="leg-title">AUTOMATIC TRANSFORMATIONS APPLIED</div>
+  <div class="leg-grid">
+    <div class="leg-item"><span class="v4k">data { id attributes{} }</span><span class="arr">→</span><span class="v5k">documentId + status + flat fields</span></div>
+    <div class="leg-item"><span class="v4k">data [{ id attributes }] + meta.pagination</span><span class="arr">→</span><span class="v5k">nodes { documentId status ... } + pageInfo</span></div>
+    <div class="leg-item"><span class="v4k">?.data?.[0]?.attributes?.X</span><span class="arr">→</span><span class="v5k">?.nodes?.[0]?.X</span></div>
+    <div class="leg-item"><span class="v4k">?.relation?.data?.attributes?.X</span><span class="arr">→</span><span class="v5k">?.relation?.X</span></div>
+    <div class="leg-item"><span class="v4k">?.list?.data?.map(e => e?.attributes?.X)</span><span class="arr">→</span><span class="v5k">?.list?.nodes?.map(e => e?.X)</span></div>
+    <div class="leg-item"><span class="v4k">Top-level collection args</span><span class="arr">→</span><span class="v5k">+ status: DRAFT added automatically</span></div>
+  </div>
+</div>
+<div class="manual">
+  <div class="manual-title">⚠ Always manually review:</div>
+  <ul>
+    <li>Mutations with entity ID args: <code>updateHotel(id: $id)</code> → <code>updateHotel(documentId: $documentId)</code></li>
+    <li>ID filters: <code>filters: { id: { eq: $id } }</code> → <code>filters: { documentId: { eq: $documentId } }</code></li>
+    <li>Remove <code>status: DRAFT</code> from queries where you only need published data</li>
+    <li>Empty collection check: v5 returns <code>[]</code> (not <code>null</code>) — update your null-checks accordingly</li>
+  </ul>
 </div>
 
 </div>
 
+<script>
+// ════════════════════════════════════════════════════════
+//  TOKENIZER
+// ════════════════════════════════════════════════════════
+function tokenize(src) {
+  const T=[];let i=0;
+  while(i<src.length){
+    if(/[ \t\r]/.test(src[i])){let s='';while(i<src.length&&/[ \t\r]/.test(src[i]))s+=src[i++];T.push({t:'ws',v:s});continue;}
+    if(src[i]==='\n'){T.push({t:'nl',v:'\n'});i++;continue;}
+    if(src[i]==='#'){let s='';while(i<src.length&&src[i]!=='\n')s+=src[i++];T.push({t:'cmt',v:s});continue;}
+    if(src.slice(i,i+3)==='"""'){let s='"""';i+=3;while(i<src.length&&src.slice(i,i+3)!=='"""'){if(src[i]==='\\')s+=src[i++];s+=src[i++];}s+='"""';i+=3;T.push({t:'str',v:s});continue;}
+    if(src[i]==='"'){let s='"';i++;while(i<src.length&&src[i]!=='"'){if(src[i]==='\\')s+=src[i++];s+=src[i++];}s+='"';i++;T.push({t:'str',v:s});continue;}
+    if(src.slice(i,i+3)==='...'){T.push({t:'...',v:'...'});i+=3;continue;}
+    if('{}():[]=!|@$,'.includes(src[i])){T.push({t:src[i],v:src[i]});i++;continue;}
+    if(/[a-zA-Z_]/.test(src[i])){let s='';while(i<src.length&&/[a-zA-Z_0-9]/.test(src[i]))s+=src[i++];T.push({t:'name',v:s});continue;}
+    if(/[-0-9]/.test(src[i])){let s='';while(i<src.length&&/[-0-9.eE+]/.test(src[i]))s+=src[i++];T.push({t:'num',v:s});continue;}
+    T.push({t:'unk',v:src[i++]});
+  }
+  return T;
+}
+
+// ════════════════════════════════════════════════════════
+//  PARSER
+// ════════════════════════════════════════════════════════
+function parse(toks){
+  let pos=0;
+  const SK=new Set(['ws','nl','cmt',',']);
+  const sk=()=>{while(pos<toks.length&&SK.has(toks[pos].t))pos++;};
+  const pk=()=>{let i=pos;while(i<toks.length&&SK.has(toks[i].t))i++;return toks[i]||null;};
+  const nx=()=>{sk();return toks[pos++];};
+  const ex=(t)=>{sk();if(!toks[pos]||toks[pos].t!==t)throw new Error(`Expected '${t}' at ${pos}, got '${toks[pos]?.t}'`);return toks[pos++];};
+  const nm=()=>{sk();if(toks[pos]?.t==='name')return toks[pos++].v;throw new Error(`Expected name at ${pos}`);};
+
+  function doc(){const defs=[];while(true){sk();if(pos>=toks.length)break;defs.push(def());}return{kind:'Doc',defs};}
+  function def(){sk();const p=pk();if(!p)throw new Error('EOF');return(p.t==='name'&&p.v==='fragment')?frag():op();}
+  function op(){sk();let o='query',n=null,v=[],d=[];if(pk()?.t==='name'&&['query','mutation','subscription'].includes(pk().v)){o=nm();if(pk()?.t==='name')n=nm();if(pk()?.t==='(')v=vdefs();d=dirs();}return{kind:'Op',op:o,name:n,vars:v,dirs:d,ss:ss()};}
+  function frag(){nm();const n=nm();nm();const on=nm();return{kind:'Frag',name:n,on,dirs:dirs(),ss:ss()};}
+  function vdefs(){ex('(');const v=[];while(pk()?.t!==')')v.push(vdef());ex(')');return v;}
+  function vdef(){ex('$');const n=nm();ex(':');const t=typ();let df=null;if(pk()?.t==='='){nx();df=val();}return{kind:'VarDef',name:n,type:t,def:df,dirs:dirs()};}
+  function typ(){sk();let t;if(pk()?.t==='['){nx();const i=typ();ex(']');t={kind:'List',t:i};}else t={kind:'Named',name:nm()};if(pk()?.t==='!'){nx();t={kind:'NonNull',t};}return t;}
+  function val(){sk();const p=pk();if(!p)throw new Error('Expected value');
+    if(p.t==='$'){nx();return{kind:'Var',name:nm()};}
+    if(p.t==='num'){nx();return{kind:'Num',v:p.v};}
+    if(p.t==='str'){nx();return{kind:'Str',v:p.v};}
+    if(p.t==='name'){if(['true','false'].includes(p.v)){nx();return{kind:'Bool',v:p.v==='true'};}if(p.v==='null'){nx();return{kind:'Null'};}nx();return{kind:'Enum',v:p.v};}
+    if(p.t==='['){nx();const vs=[];while(pk()?.t!==']')vs.push(val());ex(']');return{kind:'List',vals:vs};}
+    if(p.t==='{'){nx();const fs=[];while(pk()?.t!=='}'){const n=nm();ex(':');const v=val();fs.push({n,v});}ex('}');return{kind:'Obj',fields:fs};}
+    throw new Error(`Unexpected value '${p.t}' '${p.v}'`);
+  }
+  function dirs(){const d=[];while(pk()?.t==='@'){nx();const n=nm();let a=[];if(pk()?.t==='(')a=args();d.push({name:n,args:a});}return d;}
+  function args(){ex('(');const a=[];while(pk()?.t!==')'){const n=nm();ex(':');const v=val();a.push({n,v});}ex(')');return a;}
+  function ss(){sk();ex('{');const s=[];while(true){sk();if(!pk()||pk().t==='}')break;s.push(sel());}ex('}');return{kind:'SS',sels:s};}
+  function sel(){sk();
+    if(pk()?.t==='...'){nx();
+      if(pk()?.t==='name'&&pk().v==='on'){nm();const on=nm();return{kind:'Inline',on,dirs:dirs(),ss:ss()};}
+      if(pk()?.t==='@'){return{kind:'Inline',on:null,dirs:dirs(),ss:ss()};}
+      const n=nm();return{kind:'Spread',name:n,dirs:dirs()};
+    }
+    return fld();
+  }
+  function fld(){sk();let al=null,n=nm();if(pk()?.t===':'){nx();al=n;n=nm();}let a=[];if(pk()?.t==='(')a=args();const d=dirs();let s=null;if(pk()?.t==='{')s=ss();return{kind:'Field',alias:al,name:n,args:a,dirs:d,ss:s};}
+  return doc();
+}
+
+// ════════════════════════════════════════════════════════
+//  TRANSFORMER  — v4 → v5, injects status field + status:DRAFT arg
+// ════════════════════════════════════════════════════════
+const STATUS_FIELD = {kind:'Field',alias:null,name:'status',args:[],dirs:[],ss:null};
+const DOC_ID_FIELD = {kind:'Field',alias:null,name:'documentId',args:[],dirs:[],ss:null};
+
+function isDW(f){return f.ss&&f.ss.sels.some(s=>s.kind==='Field'&&s.name==='attributes');}
+
+function txDoc(d){return{...d,defs:d.defs.map(txDef)};}
+function txDef(d){
+  if(d.kind==='Op'||d.kind==='Frag') return{...d,ss:txSS(d.ss,d.kind==='Op')};
+  return d;
+}
+function txSS(ss,top=false){if(!ss)return null;return{...ss,sels:txSels(ss.sels,top)};}
+
+function txSels(sels,top=false){
+  const isCol=sels.some(s=>s.kind==='Field'&&s.name==='meta'&&s.ss?.sels?.some(ss=>ss.kind==='Field'&&ss.name==='pagination'));
+  const out=[];
+  for(const sel of sels){
+    if(sel.kind==='Spread'){out.push(sel);continue;}
+    if(sel.kind==='Inline'){out.push({...sel,ss:txSS(sel.ss)});continue;}
+
+    // data wrapper
+    if(sel.name==='data'&&isDW(sel)){
+      const inner=sel.ss.sels;
+      const af=inner.find(s=>s.kind==='Field'&&s.name==='attributes');
+      const rest=inner.filter(s=>s.kind==='Field'&&s.name!=='attributes'&&s.name!=='id');
+      if(isCol){
+        const ni=[DOC_ID_FIELD, STATUS_FIELD];
+        if(af?.ss) ni.push(...txSels(af.ss.sels));
+        ni.push(...rest.map(txF));
+        out.push({kind:'Field',alias:sel.alias,name:'nodes',args:[],dirs:sel.dirs,ss:{kind:'SS',sels:ni}});
+      } else {
+        out.push(DOC_ID_FIELD, STATUS_FIELD);
+        if(af?.ss) out.push(...txSels(af.ss.sels));
+        out.push(...rest.map(txF));
+      }
+      continue;
+    }
+    // meta.pagination → pageInfo
+    if(sel.name==='meta'&&sel.ss){
+      const pg=sel.ss.sels.find(s=>s.kind==='Field'&&s.name==='pagination');
+      if(pg){out.push({kind:'Field',alias:null,name:'pageInfo',args:[],dirs:sel.dirs,ss:{kind:'SS',sels:pg.ss?txSels(pg.ss.sels):[]}});continue;}
+    }
+    // top-level collection: add status:DRAFT arg
+    if(top&&sel.kind==='Field'&&sel.ss){
+      const hasW=sel.ss.sels.some(s=>s.kind==='Field'&&s.name==='data'&&isDW(s));
+      if(hasW){
+        const na=[...(sel.args||[])];
+        if(!na.some(a=>a.n==='status')) na.push({n:'status',v:{kind:'Enum',v:'DRAFT'}});
+        out.push(txF({...sel,args:na}));
+        continue;
+      }
+    }
+    out.push(txF(sel));
+  }
+  return out;
+}
+function txF(f){return{...f,ss:f.ss?txSS(f.ss):null};}
+
+// ════════════════════════════════════════════════════════
+//  PRINTER
+// ════════════════════════════════════════════════════════
+function printDoc(doc){return doc.defs.map(d=>printDef(d,0)).join('\n\n');}
+function printDef(d,ind){
+  if(d.kind==='Op'){
+    let s='';const hdr=d.name||d.vars?.length||d.op!=='query'||d.dirs?.length;
+    if(hdr){s+=d.op;if(d.name)s+=' '+d.name;if(d.vars?.length)s+='('+d.vars.map(pVD).join(', ')+')';if(d.dirs?.length)s+=' '+d.dirs.map(pD).join(' ');s+=' ';}
+    return s+pSS(d.ss,ind);
+  }
+  if(d.kind==='Frag'){let s=`fragment ${d.name} on ${d.on}`;if(d.dirs?.length)s+=' '+d.dirs.map(pD).join(' ');return s+' '+pSS(d.ss,ind);}
+  return'';
+}
+function pSS(ss,ind){
+  if(!ss||!ss.sels.length)return'{}';
+  const I='  '.repeat(ind),I1='  '.repeat(ind+1);
+  return'{\n'+ss.sels.map(s=>I1+pSel(s,ind+1)).join('\n')+'\n'+I+'}';
+}
+function pSel(s,ind){
+  if(s.kind==='Spread'){let r=`...${s.name}`;if(s.dirs?.length)r+=' '+s.dirs.map(pD).join(' ');return r;}
+  if(s.kind==='Inline'){let r='...';if(s.on)r+=` on ${s.on}`;if(s.dirs?.length)r+=' '+s.dirs.map(pD).join(' ');return r+' '+pSS(s.ss,ind);}
+  let r='';if(s.alias)r+=s.alias+': ';r+=s.name;
+  if(s.args?.length)r+='('+s.args.map(a=>a.n+': '+pV(a.v)).join(', ')+')';
+  if(s.dirs?.length)r+=' '+s.dirs.map(pD).join(' ');
+  if(s.ss)r+=' '+pSS(s.ss,ind);
+  return r;
+}
+function pVD(v){let s=`$${v.name}: ${pT(v.type)}`;if(v.def)s+=' = '+pV(v.def);if(v.dirs?.length)s+=' '+v.dirs.map(pD).join(' ');return s;}
+function pT(t){if(t.kind==='NonNull')return pT(t.t)+'!';if(t.kind==='List')return'['+pT(t.t)+']';return t.name;}
+function pV(v){
+  if(!v)return'';if(v.kind==='Var')return'$'+v.name;if(v.kind==='Num')return v.v;
+  if(v.kind==='Str')return v.v;if(v.kind==='Bool')return v.v?'true':'false';
+  if(v.kind==='Null')return'null';if(v.kind==='Enum')return v.v;
+  if(v.kind==='List')return'['+v.vals.map(pV).join(', ')+']';
+  if(v.kind==='Obj')return'{'+v.fields.map(f=>f.n+': '+pV(f.v)).join(', ')+'}';
+  return'';
+}
+function pD(d){let s='@'+d.name;if(d.args?.length)s+='('+d.args.map(a=>a.n+': '+pV(a.v)).join(', ')+')';return s;}
+
+// ════════════════════════════════════════════════════════
+//  TEMPLATE LITERAL PREPROCESSING  (handles ${var} in gql)
+// ════════════════════════════════════════════════════════
+function preGQL(g){const ph=[];const out=g.replace(/\$\{([^}]*)\}/g,(_,c)=>{ph.push(c);return`"__PH${ph.length-1}__"`;});return{out,ph};}
+function postGQL(g,ph){return g.replace(/"__PH(\d+)__"/g,(_,i)=>`\${${ph[i]}}`);}
+
+// ════════════════════════════════════════════════════════
+//  MAIN GQL CONVERT
+// ════════════════════════════════════════════════════════
+function convertGQL(input){
+  try{
+    const{out,ph}=preGQL(input);
+    const raw=printDoc(txDoc(parse(tokenize(out))));
+    const output=postGQL(raw,ph);
+    const changed=output.trim()!==input.trim();
+    const warnings=[];
+    if(/\bid\s*:/i.test(input)&&/\b(update|delete)\b/i.test(input))
+      warnings.push('Check mutation ID arg: id → documentId');
+    return{ok:true,output,changed,warnings};
+  }catch(e){return{ok:false,error:e.message};}
+}
+
+// ════════════════════════════════════════════════════════
+//  JS RESPONSE TRANSFORMER
+// ════════════════════════════════════════════════════════
+function txResponse(code, col){
+  let s=code;
+  s=s.replace(/\?\.data\?\.\[(\d+)\]\?\.attributes\?\./g,'?.nodes?.[$1]?.'); // indexed collection
+  s=s.replace(/\?\.data\?\.attributes\?\./g,'?.');                            // single relation
+  s=s.replace(/\?\.data\?\.map\(/g,'?.nodes?.map(');                          // list map
+  s=s.replace(/\?\.data\?\.length/g,'?.nodes?.length');                       // length check
+  s=s.replace(/\?\.attributes\?\./g,'?.');                                    // callback attributes
+  s=s.replace(/(?<!res)\?\.data\b/g,'?.nodes');                               // remaining .data
+  if(col){
+    const sx=`res?.data?.${col}?.nodes?.[0]?.status`;
+    s=s.replace(/return\s*\{(\s*)/,`return {$1status: ${sx},\n            `);
+  }
+  return s;
+}
+
+function getColName(gql){return(gql.match(/(?:query|mutation)\s*\w*[^{]*\{[\s\n]*(\w+)/)||[])[1]||null;}
+
+// ════════════════════════════════════════════════════════
+//  JS FUNCTION CONVERTER
+// ════════════════════════════════════════════════════════
+function convertJSFn(jsCode){
+  const gqlRe=/gql`([\s\S]*?)`/;
+  const gm=jsCode.match(gqlRe);
+  if(!gm) return{ok:true,output:txResponse(jsCode,null),gql:null,col:null};
+
+  const origGQL=gm[1].trim();
+  const gr=convertGQL(origGQL);
+  const newGQL=gr.ok?gr.output:origGQL;
+  const col=getColName(origGQL);
+
+  // Re-indent
+  const indM=gm[1].match(/^(\s*)/);
+  const ind=indM?indM[1]:'        ';
+  const indented=newGQL.split('\n').map((l,i)=>i===0?l:ind+l).join('\n');
+
+  let out=jsCode.replace(gqlRe,`gql\`\n${ind}${indented}\n      \``);
+  out=txResponse(out,col);
+
+  return{ok:true,output:out,gql:newGQL,gqlOk:gr.ok,col,warnings:gr.warnings||[]};
+}
+
+// ════════════════════════════════════════════════════════
+//  UI UTILS
+// ════════════════════════════════════════════════════════
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+const ICOPY=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+
+function doCopy(id,text){
+  navigator.clipboard.writeText(text);
+  const b=document.getElementById(id);if(!b)return;
+  const o=b.innerHTML;b.textContent='✓ Copied!';b.classList.add('ok');
+  setTimeout(()=>{b.innerHTML=o;b.classList.remove('ok');},1500);
+}
+
+// ════════════════════════════════════════════════════════
+//  TAB SWITCH
+// ════════════════════════════════════════════════════════
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['gql','js'][i]===t));
+  document.getElementById('tab-gql').classList.toggle('hidden',t!=='gql');
+  document.getElementById('tab-js').classList.toggle('hidden',t!=='js');
+}
+
+// ════════════════════════════════════════════════════════
+//  GQL TAB
+// ════════════════════════════════════════════════════════
+let gSt={items:[],done:0};
+function splitQ(r){return r.split(/\n# ---\n|^# ---\n/m).map(q=>q.trim()).filter(Boolean);}
+function opName(q){return(q.match(/(?:query|mutation|subscription|fragment)\s+(\w+)/)||[])[1]||null;}
+function updateGQLCount(){
+  const r=document.getElementById('gql-inp').value.trim();
+  const n=r?splitQ(r).length:0;
+  document.getElementById('gql-count').textContent=n===0?'No queries detected':`${n} quer${n===1?'y':'ies'} detected`;
+  document.getElementById('gql-btn').disabled=n===0;
+}
+function gCardHTML(i){
+  const r=gSt.items[i];
+  const name=opName(r.v4)||`Query ${i+1}`;
+  const ok=r.ok;
+  const sc=ok===true?'var(--green)':ok===false?'var(--red)':'var(--mt)';
+  const icon=ok===true?'✓':ok===false?'✗':'○';
+  const cls=ok===true?'done':ok===false?'err':'';
+  const wt=(r.warnings||[]).map(w=>`<span class="warn-tag">⚠ ${esc(w)}</span>`).join(' ');
+  const preId=`gp${i}`;
+  const btnId=`gb${i}`;
+  let v5html='';
+  if(ok===true){
+    v5html=`<div class="plbl plbl-v5">STRAPI v5 <span style="color:var(--yellow);font-size:9px">+ status: DRAFT</span></div><pre id="${preId}">${esc(r.output)}</pre>`;
+  } else if(ok===false){
+    v5html=`<div class="plbl plbl-v5">STRAPI v5</div><div style="color:var(--red);font-size:11px;padding-top:4px">✗ ${esc(r.error||'Parse error')}</div>`;
+  }
+  const cb=ok===true?`<button class="btn-copy" id="${btnId}" onclick="doCopy('${btnId}',document.getElementById('${preId}').textContent)">${ICOPY} Copy v5</button>`:'';
+  return `<div class="card ${cls}" id="gc${i}">
+  <div class="chead"><div class="ctitle"><span style="color:${sc}">${icon}</span><span class="cname">${esc(name)}</span>${wt}</div>${cb}</div>
+  <div class="cbody">
+    <div class="cpane pane-v4"><div class="plbl plbl-v4">STRAPI v4</div><pre>${esc(r.v4)}</pre></div>
+    <div class="cpane pane-v5">${v5html}</div>
+  </div>
+</div>`;
+}
+function refreshGCard(i){const el=document.getElementById(`gc${i}`);const h=gCardHTML(i);if(el)el.outerHTML=h;else document.getElementById('gql-results').insertAdjacentHTML('beforeend',h);}
+function updateProg(){
+  const tot=gSt.items.length,dn=gSt.done;
+  const bar=document.getElementById('progbar');
+  bar.style.width=(tot>0?dn/tot*100:0)+'%';
+  if(dn===tot&&tot>0)bar.classList.add('done');
+  document.getElementById('proglbl').textContent=dn===tot&&tot>0?`✓ All ${tot} queries converted!`:`Converting… ${dn}/${tot}`;
+  if(dn>0)document.getElementById('copyallbtn').style.display='flex';
+}
+function convertAllGQL(){
+  const raw=document.getElementById('gql-inp').value.trim();if(!raw)return;
+  const qs=splitQ(raw);
+  gSt={items:qs.map(v4=>({v4})),done:0};
+  document.getElementById('progwrap').style.display='block';
+  document.getElementById('progbar').style.width='0%';document.getElementById('progbar').classList.remove('done');
+  document.getElementById('copyallbtn').style.display='none';
+  document.getElementById('gql-btn').disabled=true;
+  document.getElementById('gql-results').innerHTML=gSt.items.map((_,i)=>gCardHTML(i)).join('');
+  for(let i=0;i<qs.length;i++){const r=convertGQL(qs[i]);gSt.items[i]={v4:qs[i],...r};gSt.done++;updateProg();refreshGCard(i);}
+  document.getElementById('gql-btn').disabled=false;
+}
+function copyAllGQL(){
+  const all=gSt.items.filter(r=>r.ok===true).map(r=>r.output).join('\n\n# ---\n\n');
+  navigator.clipboard.writeText(all);
+  const b=document.getElementById('copyallbtn');
+  b.textContent='✓ Copied!';b.classList.add('ok');
+  setTimeout(()=>{b.innerHTML=`${ICOPY} Copy All v5`;b.classList.remove('ok');},2000);
+}
+
+// ════════════════════════════════════════════════════════
+//  JS FUNCTION TAB
+// ════════════════════════════════════════════════════════
+function updateJSBtn(){
+  const v=document.getElementById('js-inp').value.trim();
+  document.getElementById('js-btn').disabled=!v;
+  document.getElementById('js-lbl').textContent=v?'Ready to convert':'Paste a JS function above';
+}
+function doConvertJS(){
+  const code=document.getElementById('js-inp').value.trim();if(!code)return;
+  const res=convertJSFn(code);
+  renderJSOut(code,res);
+}
+function renderJSOut(orig,res){
+  const el=document.getElementById('js-out');
+  if(!res.ok){el.innerHTML=`<div class="jspanel err"><div class="jspanel-head"><span class="plbl" style="color:var(--red)">ERROR</span></div><pre style="color:var(--red)">${esc(res.error||'')}</pre></div>`;return;}
+
+  let gqlSec='';
+  if(res.gql){
+    const origGQL=(orig.match(/gql`([\s\S]*?)`/)||['',''])[1].trim();
+    gqlSec=`<div style="margin-bottom:14px">
+      <div class="lbl" style="margin-bottom:8px">📄 Extracted GraphQL — v4 vs v5</div>
+      <div class="card done" style="margin:0">
+        <div class="chead">
+          <div class="ctitle"><span style="color:var(--green)">✓</span><span class="cname">GraphQL Query Migration</span></div>
+          <span class="badge yellow" style="margin-left:0">status: DRAFT + status field injected</span>
+        </div>
+        <div class="cbody">
+          <div class="cpane pane-v4"><div class="plbl plbl-v4">v4 ORIGINAL</div><pre>${esc(origGQL)}</pre></div>
+          <div class="cpane pane-v5"><div class="plbl plbl-v5">v5 CONVERTED</div><pre>${esc(res.gql)}</pre></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const preId='jcp',btnId='jcb';
+  el.innerHTML=`${gqlSec}
+    <div class="lbl" style="margin-bottom:8px">⚙️ Full JS Function — Original vs Converted</div>
+    <div class="js-grid">
+      <div class="jspanel">
+        <div class="jspanel-head"><span class="plbl plbl-v4">ORIGINAL (v4)</span></div>
+        <pre>${esc(orig)}</pre>
+      </div>
+      <div class="jspanel done">
+        <div class="jspanel-head">
+          <span class="plbl plbl-v5">CONVERTED (v5) <span style="color:var(--yellow);font-size:9px">+ status injected</span></span>
+          <button class="btn-copy" id="${btnId}" onclick="doCopy('${btnId}',document.getElementById('${preId}').textContent)">${ICOPY} Copy v5</button>
+        </div>
+        <pre id="${preId}">${esc(res.output)}</pre>
+      </div>
+    </div>
+    ${res.warnings?.length?`<div class="manual" style="margin-top:8px"><div class="manual-title">⚠ Warnings</div><ul>${res.warnings.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`:''}`;
+}
+
+// ════════════════════════════════════════════════════════
+//  EXAMPLES
+// ════════════════════════════════════════════════════════
+const GQL_EX=`query GetHotels($page: Int, $pageSize: Int) {
+  hotels(pagination: { page: $page, pageSize: $pageSize }) {
+    data {
+      id
+      attributes {
+        HotelKey
+        HotelName
+        Slug
+        StarRating {
+          data {
+            attributes {
+              RatingLevel
+            }
+          }
+        }
+        Country {
+          data {
+            attributes {
+              CountryName
+              Slug
+            }
+          }
+        }
+        FacilitiesV1(pagination: { pageSize: 500 }) {
+          data {
+            attributes {
+              Description
+              Code
+              TopAminitiesPriority
+            }
+          }
+        }
+      }
+    }
+    meta {
+      pagination {
+        total
+        page
+        pageSize
+        pageCount
+      }
+    }
+  }
+}
+# ---
+query GetSingleHotel($hotelId: String!) {
+  hotels(filters: { HotelKey: { eq: $hotelId } }) {
+    data {
+      id
+      attributes {
+        HotelName
+        Description
+        flashDeal
+        GoogleReview
+      }
+    }
+  }
+}`;
+
+// The exact file the user uploaded (slightly trimmed for example)
+const JS_EX=`export const getHotelDetailsByHotelId = async (hotelId) => {
+  return await client
+    .query({
+      query: gql\`
+        query Hotel {
+          hotels(filters: { HotelKey: { eq: "\${hotelId}" } }) {
+            data {
+              attributes {
+                HotelKey
+                HotelName
+                Description
+                Slug
+                StarRating {
+                  data {
+                    attributes {
+                      RatingLevel
+                    }
+                  }
+                }
+                Country {
+                  data {
+                    attributes {
+                      CountryName
+                      Slug
+                    }
+                  }
+                }
+                Province {
+                  data {
+                    attributes {
+                      ProvinceName
+                      Slug
+                      ProvinceId
+                      Airports {
+                        data {
+                          attributes {
+                            AirportCode
+                            AirportName
+                          }
+                        }
+                      }
+                      MapInfo {
+                        Lat
+                        Long
+                        Zoom
+                      }
+                    }
+                  }
+                }
+                FacilitiesV1(pagination: { pageSize: 500 }) {
+                  data {
+                    attributes {
+                      Description
+                      Code
+                      TopAminitiesPriority
+                    }
+                  }
+                }
+                Faq(pagination: { pageSize: 100 }) {
+                  Title
+                  Description
+                }
+                flashDeal
+                GoogleReview
+              }
+            }
+          }
+        }
+      \`,
+    })
+    .then((res) => {
+      return res?.data?.hotels?.data
+        ? {
+            hotelKey: res?.data?.hotels?.data?.[0]?.attributes?.HotelKey,
+            hotelName: res?.data?.hotels?.data?.[0]?.attributes?.HotelName,
+            description: res?.data?.hotels?.data?.[0]?.attributes?.Description,
+            slug: res?.data?.hotels?.data?.[0]?.attributes?.Slug,
+            rating: res?.data?.hotels?.data?.[0]?.attributes?.StarRating?.data?.attributes?.RatingLevel ?? 0,
+            country: {
+              countryName: res?.data?.hotels?.data?.[0]?.attributes?.Country?.data?.attributes?.CountryName,
+              slug: res?.data?.hotels?.data?.[0]?.attributes?.Country?.data?.attributes?.Slug,
+            },
+            province: {
+              provinceName: res?.data?.hotels?.data?.[0]?.attributes?.Province?.data?.attributes?.ProvinceName,
+              slug: res?.data?.hotels?.data?.[0]?.attributes?.Province?.data?.attributes?.Slug,
+              provinceId: res?.data?.hotels?.data?.[0]?.attributes?.Province?.data?.attributes?.ProvinceId,
+              airportCodes: res?.data?.hotels?.data?.[0]?.attributes?.Province?.data?.attributes?.Airports?.data?.map(
+                (eachAirport) => ({ airportCode: eachAirport?.attributes?.AirportCode })
+              ),
+              mapInfo: {
+                lat: res?.data?.hotels?.data?.[0]?.attributes?.Province?.data?.attributes?.MapInfo?.Lat || null,
+                long: res?.data?.hotels?.data?.[0]?.attributes?.Province?.data?.attributes?.MapInfo?.Long || null,
+                zoom: res?.data?.hotels?.data?.[0]?.attributes?.Province?.data?.attributes?.MapInfo?.Zoom || null,
+              },
+            },
+            facilities: res?.data?.hotels?.data?.[0]?.attributes?.FacilitiesV1?.data?.length > 0
+              ? res?.data?.hotels?.data?.[0]?.attributes?.FacilitiesV1?.data
+              : [],
+            faq: res?.data?.hotels?.data?.[0]?.attributes?.Faq?.length > 0
+              ? res?.data?.hotels?.data?.[0]?.attributes?.Faq
+              : [],
+            flashDeal: res?.data?.hotels?.data?.[0]?.attributes?.flashDeal || null,
+            GoogleReview: res?.data?.hotels?.data?.[0]?.attributes?.GoogleReview || null,
+          }
+        : null;
+    });
+};`;
+
+function loadGQLEx(){document.getElementById('gql-inp').value=GQL_EX;updateGQLCount();}
+function loadJSEx(){document.getElementById('js-inp').value=JS_EX;updateJSBtn();}
+</script>
 </body>
 </html>
