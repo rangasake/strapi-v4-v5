@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Strapi GraphQL Migrator — v4 → v5 (Offline)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f;--s1:#0d1018;--s2:#111420;--b1:#1c1f2e;--b2:#252840;
+  --tx:#d8dff0;--mt:#5a6080;--dm:#2a2d40;
+  --ac:#5b6ef5;--ac2:#7c3aed;
+  --green:#34d399;--red:#f87171;--yellow:#fbbf24;--blue:#60a5fa;
+  --mono:'IBM Plex Mono',monospace;--display:'Syne',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--tx);font-family:var(--mono);font-size:13px;min-height:100vh;padding:36px 24px 60px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--dm);border-radius:3px}
+
+.wrap{max-width:1200px;margin:0 auto}
+
+/* header */
+.hdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:32px}
+.logo{width:44px;height:44px;flex-shrink:0;border-radius:12px;background:linear-gradient(135deg,var(--ac),var(--ac2));display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 28px rgba(91,110,245,.3)}
+.hdr h1{font-family:var(--display);font-size:24px;font-weight:800;letter-spacing:-.03em;background:linear-gradient(90deg,#d8dff0,#7c8ab8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:5px}
+.badge{display:inline-flex;align-items:center;background:rgba(91,110,245,.12);border:1px solid rgba(91,110,245,.3);border-radius:20px;padding:2px 10px;font-size:10px;color:var(--ac);font-weight:600;letter-spacing:.06em;margin-left:8px;vertical-align:middle}
+.badge.offline{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:var(--green)}
+.hdr p{font-size:12px;color:var(--mt);line-height:1.7}
+
+/* panels */
+.panel{background:var(--s1);border:1px solid var(--b1);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.phead{background:var(--s2);border-bottom:1px solid var(--b1);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+.phead-lbl{font-size:11px;color:var(--mt)}
+.pfoot{background:var(--s2);border-top:1px solid var(--b1);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+
+textarea#inp{width:100%;min-height:200px;background:transparent;border:none;padding:14px 16px;color:#8a98c4;font-family:var(--mono);font-size:12px;line-height:1.75;resize:vertical;outline:none}
+textarea#inp::placeholder{color:var(--dm)}
+
+#qcount{font-size:11px;color:var(--mt)}
+
+.btn-primary{background:linear-gradient(135deg,var(--ac),var(--ac2));border:none;border-radius:8px;padding:8px 22px;color:#fff;font-family:var(--mono);font-weight:600;font-size:13px;cursor:pointer;transition:opacity .2s,transform .1s;display:flex;align-items:center;gap:7px}
+.btn-primary:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-ghost{background:transparent;border:1px solid var(--b2);border-radius:6px;padding:3px 11px;color:var(--mt);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .15s}
+.btn-ghost:hover{border-color:var(--ac);color:var(--ac)}
+
+/* progress */
+#progwrap{margin-bottom:16px;display:none}
+.prog-info{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.prog-info span{font-size:11px;color:var(--mt)}
+#progtrack{height:3px;background:var(--dm);border-radius:2px;overflow:hidden}
+#progbar{height:100%;width:0%;background:linear-gradient(90deg,var(--ac),var(--ac2));border-radius:2px;transition:width .25s ease}
+#progbar.done{background:var(--green)}
+
+.btn-copyall{background:var(--s2);border:1px solid var(--b2);border-radius:6px;padding:4px 13px;color:var(--mt);font-family:var(--mono);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
+.btn-copyall:hover,.btn-copyall.ok{border-color:var(--green);color:var(--green)}
+
+/* cards */
+#results{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden;animation:fi .2s ease}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.card.done{border-color:#1a3326}
+.card.warn{border-color:#3a2e10}
+.card.err{border-color:#3a1a1a}
+
+.chead{background:var(--s2);border-bottom:1px solid var(--b1);padding:9px 14px;display:flex;align-items:center;justify-content:space-between}
+.card.done .chead{background:#0b1e16}
+.card.warn .chead{background:#1e1a0b}
+.card.err  .chead{background:#1e0b0b}
+
+.ctitle{display:flex;align-items:center;gap:9px}
+.cname{font-size:12px;color:var(--tx);font-weight:600}
+.cstatus{font-size:12px}
+
+.cbody{display:grid;grid-template-columns:1fr 1fr}
+.cpane{padding:12px 14px}
+.cpane:first-child{border-right:1px solid var(--b1)}
+.plbl{font-size:9px;font-weight:700;letter-spacing:.1em;margin-bottom:8px}
+.plbl-v4{color:var(--red)}
+.plbl-v5{color:var(--green)}
+.cpane pre{margin:0;font-family:var(--mono);font-size:11.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.pane-v4 pre{color:#7a8ab0}
+.pane-v5 pre{color:#86efac}
+.pane-warn pre{color:#fde68a}
+
+.btn-copy1{background:transparent;border:1px solid var(--b2);border-radius:5px;padding:3px 10px;color:var(--mt);font-family:var(--mono);font-size:10px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .15s}
+.btn-copy1:hover,.btn-copy1.ok{border-color:var(--green);color:var(--green)}
+
+/* warnings */
+.warn-tag{font-size:10px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:4px;padding:2px 7px;color:var(--yellow)}
+
+/* legend */
+.legend{margin-top:24px;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:16px 18px}
+.leg-title{font-size:10px;color:var(--mt);font-weight:600;letter-spacing:.08em;margin-bottom:10px}
+.leg-grid{display:flex;flex-wrap:wrap;gap:8px 28px}
+.leg-item{font-size:11px;display:flex;align-items:center;gap:6px}
+.v4k{color:#f97316}.v5k{color:var(--green)}.arr{color:var(--dm)}
+
+/* manual steps */
+.manual{margin-top:12px;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:12px 16px}
+.manual-title{font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:8px}
+.manual ul{list-style:none;display:flex;flex-direction:column;gap:5px}
+.manual li{font-size:11px;color:#b0a060;display:flex;gap:8px}
+.manual li::before{content:'→';color:var(--yellow);flex-shrink:0}
+
+@media(max-width:640px){
+  .cbody{grid-template-columns:1fr}
+  .cpane:first-child{border-right:none;border-bottom:1px solid var(--b1)}
+  body{padding:20px 12px 40px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+  <div class="logo">⚡</div>
+  <div>
+    <h1>Strapi GraphQL Migrator
+      <span class="badge">v4 → v5</span>
+      <span class="badge offline">Offline</span>
+    </h1>
+    <p>Paste your v4 queries separated by <code style="background:var(--s2);padding:1px 5px;border-radius:3px;color:#94a3b8"># ---</code> on its own line · No API key required · Works fully offline</p>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="phead">
+    <span class="phead-lbl">Paste your Strapi v4 GraphQL queries</span>
+    <button class="btn-ghost" onclick="loadExample()">Load Example</button>
+  </div>
+  <textarea id="inp" oninput="updateCount()" placeholder="query GetProducts {&#10;  products {&#10;    data {&#10;      id&#10;      attributes {&#10;        name&#10;        price&#10;      }&#10;    }&#10;    meta { pagination { total page pageSize pageCount } }&#10;  }&#10;}&#10;# ---&#10;query GetCategory($id: ID!) { ... }"></textarea>
+  <div class="pfoot">
+    <span id="qcount">No queries detected</span>
+    <button class="btn-primary" id="convbtn" onclick="convertAll()" disabled>⚡ Convert All to v5</button>
+  </div>
+</div>
+
+<div id="progwrap">
+  <div class="prog-info">
+    <span id="proglbl">Converting...</span>
+    <button class="btn-copyall" id="copyallbtn" onclick="copyAll()" style="display:none">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy All v5
+    </button>
+  </div>
+  <div id="progtrack"><div id="progbar"></div></div>
+</div>
+
+<div id="results"></div>
+
+<div class="legend">
+  <div class="leg-title">AUTOMATIC TRANSFORMATIONS APPLIED</div>
+  <div class="leg-grid">
+    <div class="leg-item"><span class="v4k">data { id  attributes{} }</span><span class="arr">→</span><span class="v5k">documentId + flat fields</span></div>
+    <div class="leg-item"><span class="v4k">data [{ id attributes }]</span><span class="arr">→</span><span class="v5k">nodes { documentId ... }</span></div>
+    <div class="leg-item"><span class="v4k">meta { pagination{} }</span><span class="arr">→</span><span class="v5k">pageInfo {}</span></div>
+    <div class="leg-item"><span class="v4k">Nested relation wrappers</span><span class="arr">→</span><span class="v5k">Flattened recursively</span></div>
+  </div>
+</div>
+
+<div class="manual">
+  <div class="manual-title">⚠ Manual review still required for:</div>
+  <ul>
+    <li>Rename <code>id:</code> argument to <code>documentId:</code> in single-entity queries & mutations (e.g. <code>updateArticle(id: $id)</code> → <code>updateArticle(documentId: $documentId)</code>)</li>
+    <li>Rename filter variables accordingly: <code>filters: { id: { eq: $id } }</code> → <code>filters: { documentId: { eq: $documentId } }</code></li>
+    <li>Check custom types or non-standard field names that may clash with <code>documentId</code></li>
+    <li>Review <code>__typename</code> usage if relying on polymorphic union types</li>
+  </ul>
+</div>
+
+</div><!-- .wrap -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  TOKENIZER
+// ═══════════════════════════════════════════════════════════════
+function tokenize(src) {
+  const toks = [];
+  let i = 0;
+  while (i < src.length) {
+    // whitespace
+    if (/[ \t\r]/.test(src[i])) {
+      let s = ''; while (i < src.length && /[ \t\r]/.test(src[i])) s += src[i++];
+      toks.push({t:'ws',v:s}); continue;
+    }
+    if (src[i] === '\n') { toks.push({t:'nl',v:'\n'}); i++; continue; }
+    // comment
+    if (src[i] === '#') {
+      let s = ''; while (i < src.length && src[i] !== '\n') s += src[i++];
+      toks.push({t:'cmt',v:s}); continue;
+    }
+    // block string
+    if (src.slice(i,i+3) === '"""') {
+      let s = '"""'; i += 3;
+      while (i < src.length && src.slice(i,i+3) !== '"""') { if (src[i]==='\\') s+=src[i++]; s+=src[i++]; }
+      s += '"""'; i += 3; toks.push({t:'str',v:s}); continue;
+    }
+    // string
+    if (src[i] === '"') {
+      let s = '"'; i++;
+      while (i < src.length && src[i] !== '"') { if (src[i]==='\\') s+=src[i++]; s+=src[i++]; }
+      s += '"'; i++; toks.push({t:'str',v:s}); continue;
+    }
+    // spread
+    if (src.slice(i,i+3) === '...') { toks.push({t:'...',v:'...'}); i+=3; continue; }
+    // single chars
+    if ('{}():[]=!|@$,'.includes(src[i])) { toks.push({t:src[i],v:src[i]}); i++; continue; }
+    // name
+    if (/[a-zA-Z_]/.test(src[i])) {
+      let s = ''; while (i < src.length && /[a-zA-Z_0-9]/.test(src[i])) s += src[i++];
+      toks.push({t:'name',v:s}); continue;
+    }
+    // number (includes leading minus for negative)
+    if (/[-0-9]/.test(src[i])) {
+      let s = ''; while (i < src.length && /[-0-9.eE+]/.test(src[i])) s += src[i++];
+      toks.push({t:'num',v:s}); continue;
+    }
+    toks.push({t:'unk',v:src[i++]});
+  }
+  return toks;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PARSER  (recursive descent → simple AST)
+// ═══════════════════════════════════════════════════════════════
+function parse(toks) {
+  let pos = 0;
+  const SKIP = new Set(['ws','nl','cmt',',']);
+
+  function skipTrivia() { while (pos < toks.length && SKIP.has(toks[pos].t)) pos++; }
+  function peek()  { let i=pos; while(i<toks.length && SKIP.has(toks[i].t)) i++; return toks[i]||null; }
+  function next()  { skipTrivia(); return toks[pos++]; }
+  function expect(type) {
+    skipTrivia();
+    if (!toks[pos] || toks[pos].t !== type)
+      throw new Error(`Expected '${type}' at pos ${pos}, got '${toks[pos]?.t}' ('${toks[pos]?.v}')`);
+    return toks[pos++];
+  }
+  function parseName() { skipTrivia(); if(toks[pos]?.t==='name') return toks[pos++].v; throw new Error(`Expected name at pos ${pos}, got '${toks[pos]?.t}' ('${toks[pos]?.v}')`); }
+
+  function parseDocument() {
+    const defs = [];
+    while (true) { skipTrivia(); if (pos >= toks.length) break; defs.push(parseDef()); }
+    return {kind:'Doc', defs};
+  }
+
+  function parseDef() {
+    skipTrivia();
+    const p = peek();
+    if (!p) throw new Error('Unexpected EOF');
+    if (p.t === 'name' && p.v === 'fragment') return parseFragment();
+    return parseOperation();
+  }
+
+  function parseOperation() {
+    skipTrivia();
+    let op = 'query', name = null, vars = [], dirs = [];
+    if (peek()?.t==='name' && ['query','mutation','subscription'].includes(peek().v)) {
+      op = parseName();
+      if (peek()?.t==='name') name = parseName();
+      if (peek()?.t==='(') vars = parseVarDefs();
+      dirs = parseDirs();
+    }
+    const ss = parseSS();
+    return {kind:'Op', op, name, vars, dirs, ss};
+  }
+
+  function parseFragment() {
+    parseName(); // 'fragment'
+    const name = parseName();
+    parseName(); // 'on'
+    const on = parseName();
+    const dirs = parseDirs();
+    const ss = parseSS();
+    return {kind:'Frag', name, on, dirs, ss};
+  }
+
+  function parseVarDefs() {
+    expect('(');
+    const vs = [];
+    while (peek()?.t !== ')') vs.push(parseVarDef());
+    expect(')');
+    return vs;
+  }
+
+  function parseVarDef() {
+    expect('$');
+    const name = parseName();
+    expect(':');
+    const type = parseType();
+    let def = null;
+    if (peek()?.t === '=') { next(); def = parseValue(); }
+    const dirs = parseDirs();
+    return {kind:'VarDef', name, type, def, dirs};
+  }
+
+  function parseType() {
+    skipTrivia();
+    let t;
+    if (peek()?.t === '[') {
+      next(); // '['
+      const inner = parseType();
+      expect(']');
+      t = {kind:'List', t:inner};
+    } else {
+      t = {kind:'Named', name: parseName()};
+    }
+    if (peek()?.t === '!') { next(); t = {kind:'NonNull', t}; }
+    return t;
+  }
+
+  function parseValue() {
+    skipTrivia();
+    const p = peek();
+    if (!p) throw new Error('Expected value');
+    if (p.t==='$') { next(); const n=parseName(); return {kind:'Var',name:n}; }
+    if (p.t==='num') { next(); return {kind:'Num',v:p.v}; }
+    if (p.t==='str') { next(); return {kind:'Str',v:p.v}; }
+    if (p.t==='name') {
+      if (['true','false'].includes(p.v)) { next(); return {kind:'Bool',v:p.v==='true'}; }
+      if (p.v==='null') { next(); return {kind:'Null'}; }
+      next(); return {kind:'Enum',v:p.v};
+    }
+    if (p.t==='[') {
+      next(); const vals=[]; while(peek()?.t!==']') vals.push(parseValue());
+      expect(']'); return {kind:'List',vals};
+    }
+    if (p.t==='{') {
+      next(); const fields=[];
+      while(peek()?.t!=='}') { const n=parseName(); expect(':'); const v=parseValue(); fields.push({n,v}); }
+      expect('}'); return {kind:'Obj',fields};
+    }
+    throw new Error(`Unexpected value token '${p.t}' '${p.v}'`);
+  }
+
+  function parseDirs() {
+    const dirs = [];
+    while (peek()?.t==='@') {
+      next(); // '@'
+      const name = parseName();
+      let args = [];
+      if (peek()?.t==='(') args = parseArgs();
+      dirs.push({name, args});
+    }
+    return dirs;
+  }
+
+  function parseArgs() {
+    expect('(');
+    const args = [];
+    while (peek()?.t !== ')') { const n=parseName(); expect(':'); const v=parseValue(); args.push({n,v}); }
+    expect(')');
+    return args;
+  }
+
+  function parseSS() {
+    skipTrivia();
+    expect('{');
+    const sels = [];
+    while (true) { skipTrivia(); if (!peek() || peek().t==='}') break; sels.push(parseSel()); }
+    expect('}');
+    return {kind:'SS', sels};
+  }
+
+  function parseSel() {
+    skipTrivia();
+    if (peek()?.t==='...') {
+      next(); // '...'
+      if (peek()?.t==='name' && peek().v==='on') {
+        parseName(); // 'on'
+        const on = parseName();
+        const dirs = parseDirs();
+        const ss = parseSS();
+        return {kind:'Inline', on, dirs, ss};
+      }
+      if (peek()?.t==='@') {
+        const dirs = parseDirs();
+        const ss = parseSS();
+        return {kind:'Inline', on:null, dirs, ss};
+      }
+      const name = parseName();
+      const dirs = parseDirs();
+      return {kind:'Spread', name, dirs};
+    }
+    return parseField();
+  }
+
+  function parseField() {
+    skipTrivia();
+    let alias = null;
+    let name = parseName();
+    if (peek()?.t===':') { next(); alias=name; name=parseName(); }
+    let args = [];
+    if (peek()?.t==='(') args = parseArgs();
+    const dirs = parseDirs();
+    let ss = null;
+    if (peek()?.t==='{') ss = parseSS();
+    return {kind:'Field', alias, name, args, dirs, ss};
+  }
+
+  return parseDocument();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TRANSFORMER
+// ═══════════════════════════════════════════════════════════════
+function transformDoc(doc) {
+  return {...doc, defs: doc.defs.map(transformDef)};
+}
+
+function transformDef(def) {
+  if (def.kind==='Op'||def.kind==='Frag')
+    return {...def, ss: transformSS(def.ss)};
+  return def;
+}
+
+function transformSS(ss) {
+  if (!ss) return null;
+  return {...ss, sels: transformSels(ss.sels)};
+}
+
+function isDataWrapper(field) {
+  // A Strapi data wrapper has sub-selections that include 'attributes'
+  // or has 'id' and nothing else meaningful
+  if (!field.ss) return false;
+  const sels = field.ss.sels.filter(s => s.kind==='Field');
+  return sels.some(s => s.name==='attributes');
+}
+
+function transformSels(sels) {
+  // Detect collection context: sibling meta.pagination
+  const isCollection = sels.some(s =>
+    s.kind==='Field' && s.name==='meta' &&
+    s.ss?.sels?.some(ss => ss.kind==='Field' && ss.name==='pagination')
+  );
+
+  const out = [];
+  for (const sel of sels) {
+    // Non-field selections
+    if (sel.kind==='Spread') { out.push(sel); continue; }
+    if (sel.kind==='Inline') { out.push({...sel, ss: transformSS(sel.ss)}); continue; }
+
+    // ── data field ──────────────────────────────────────────
+    if (sel.name==='data' && isDataWrapper(sel)) {
+      const inner = sel.ss.sels;
+      const attrField = inner.find(s => s.kind==='Field' && s.name==='attributes');
+      const otherFields = inner.filter(s => s.kind==='Field' && s.name!=='attributes' && s.name!=='id');
+
+      if (isCollection) {
+        // data [{ id attributes }] → nodes { documentId ... }
+        const nodesInner = [
+          {kind:'Field', alias:null, name:'documentId', args:[], dirs:[], ss:null}
+        ];
+        if (attrField?.ss) nodesInner.push(...transformSels(attrField.ss.sels));
+        nodesInner.push(...otherFields.map(f => transformField(f)));
+        out.push({kind:'Field', alias:sel.alias, name:'nodes', args:[], dirs:sel.dirs,
+          ss:{kind:'SS', sels: nodesInner}});
+      } else {
+        // single entity: flatten inline
+        out.push({kind:'Field', alias:null, name:'documentId', args:[], dirs:[], ss:null});
+        if (attrField?.ss) out.push(...transformSels(attrField.ss.sels));
+        out.push(...otherFields.map(f => transformField(f)));
+      }
+      continue;
+    }
+
+    // ── meta { pagination { ... } } → pageInfo { ... } ──────
+    if (sel.name==='meta' && sel.ss) {
+      const pagField = sel.ss.sels.find(s => s.kind==='Field' && s.name==='pagination');
+      if (pagField) {
+        out.push({kind:'Field', alias:null, name:'pageInfo', args:[], dirs:sel.dirs,
+          ss:{kind:'SS', sels: pagField.ss ? transformSels(pagField.ss.sels) : []}});
+        continue;
+      }
+    }
+
+    // default: recurse
+    out.push(transformField(sel));
+  }
+  return out;
+}
+
+function transformField(f) {
+  return {...f, ss: f.ss ? transformSS(f.ss) : null};
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PRINTER
+// ═══════════════════════════════════════════════════════════════
+function printDoc(doc) {
+  return doc.defs.map(d => printDef(d, 0)).join('\n\n');
+}
+
+function printDef(def, ind) {
+  if (def.kind==='Op') {
+    let s = '';
+    const hasHeader = def.name || def.vars?.length || def.op!=='query' || def.dirs?.length;
+    if (hasHeader) {
+      s += def.op;
+      if (def.name) s += ' '+def.name;
+      if (def.vars?.length) s += '('+def.vars.map(printVarDef).join(', ')+')';
+      if (def.dirs?.length) s += ' '+def.dirs.map(printDir).join(' ');
+      s += ' ';
+    }
+    s += printSS(def.ss, ind);
+    return s;
+  }
+  if (def.kind==='Frag') {
+    let s = `fragment ${def.name} on ${def.on}`;
+    if (def.dirs?.length) s += ' '+def.dirs.map(printDir).join(' ');
+    s += ' '+printSS(def.ss, ind);
+    return s;
+  }
+  return '';
+}
+
+function printSS(ss, ind) {
+  if (!ss||!ss.sels.length) return '{}';
+  const I = '  '.repeat(ind), I1 = '  '.repeat(ind+1);
+  return '{\n'+ss.sels.map(s => I1+printSel(s, ind+1)).join('\n')+'\n'+I+'}';
+}
+
+function printSel(sel, ind) {
+  if (sel.kind==='Spread') {
+    let s = `...${sel.name}`;
+    if (sel.dirs?.length) s += ' '+sel.dirs.map(printDir).join(' ');
+    return s;
+  }
+  if (sel.kind==='Inline') {
+    let s = '...';
+    if (sel.on) s += ` on ${sel.on}`;
+    if (sel.dirs?.length) s += ' '+sel.dirs.map(printDir).join(' ');
+    s += ' '+printSS(sel.ss, ind);
+    return s;
+  }
+  // Field
+  let s = '';
+  if (sel.alias) s += sel.alias+': ';
+  s += sel.name;
+  if (sel.args?.length) s += '('+sel.args.map(a => a.n+': '+printVal(a.v)).join(', ')+')';
+  if (sel.dirs?.length) s += ' '+sel.dirs.map(printDir).join(' ');
+  if (sel.ss) s += ' '+printSS(sel.ss, ind);
+  return s;
+}
+
+function printVarDef(v) {
+  let s = `$${v.name}: ${printType(v.type)}`;
+  if (v.def) s += ' = '+printVal(v.def);
+  if (v.dirs?.length) s += ' '+v.dirs.map(printDir).join(' ');
+  return s;
+}
+
+function printType(t) {
+  if (t.kind==='NonNull') return printType(t.t)+'!';
+  if (t.kind==='List')    return '['+printType(t.t)+']';
+  return t.name;
+}
+
+function printVal(v) {
+  if (!v) return '';
+  if (v.kind==='Var')  return '$'+v.name;
+  if (v.kind==='Num')  return v.v;
+  if (v.kind==='Str')  return v.v;
+  if (v.kind==='Bool') return v.v?'true':'false';
+  if (v.kind==='Null') return 'null';
+  if (v.kind==='Enum') return v.v;
+  if (v.kind==='List') return '['+v.vals.map(printVal).join(', ')+']';
+  if (v.kind==='Obj')  return '{'+v.fields.map(f => f.n+': '+printVal(f.v)).join(', ')+'}';
+  return '';
+}
+
+function printDir(d) {
+  let s = '@'+d.name;
+  if (d.args?.length) s += '('+d.args.map(a => a.n+': '+printVal(a.v)).join(', ')+')';
+  return s;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MAIN CONVERT FUNCTION
+// ═══════════════════════════════════════════════════════════════
+function convertGQL(input) {
+  try {
+    const toks = tokenize(input);
+    const ast  = parse(toks);
+    const tx   = transformDoc(ast);
+    const out  = printDoc(tx);
+
+    // Detect if anything actually changed
+    const changed = out.trim() !== input.trim();
+
+    // Warn if likely has remaining manual steps
+    const warnings = [];
+    if (/\bid\s*:/i.test(input) && /\b(update|delete|query.*?Id)\b/i.test(input))
+      warnings.push('May need id: → documentId: in arguments');
+
+    return {ok: true, output: out, changed, warnings};
+  } catch(e) {
+    return {ok: false, error: e.message};
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UI
+// ═══════════════════════════════════════════════════════════════
+const EXAMPLE = `query GetArticles($page: Int, $pageSize: Int) {
+  articles(pagination: { page: $page, pageSize: $pageSize }) {
+    data {
+      id
+      attributes {
+        title
+        slug
+        publishedAt
+        cover {
+          data {
+            id
+            attributes {
+              url
+              alternativeText
+              width
+              height
+            }
+          }
+        }
+        author {
+          data {
+            id
+            attributes {
+              name
+              email
+              avatar {
+                data {
+                  attributes {
+                    url
+                  }
+                }
+              }
+            }
+          }
+        }
+        tags {
+          data {
+            id
+            attributes {
+              name
+            }
+          }
+        }
+      }
+    }
+    meta {
+      pagination {
+        total
+        page
+        pageSize
+        pageCount
+      }
+    }
+  }
+}
+# ---
+query GetSinglePost($slug: String!) {
+  posts(filters: { slug: { eq: $slug } }) {
+    data {
+      id
+      attributes {
+        title
+        content
+        publishedAt
+        category {
+          data {
+            id
+            attributes {
+              name
+              slug
+            }
+          }
+        }
+      }
+    }
+  }
+}
+# ---
+mutation CreateComment($data: CommentInput!) {
+  createComment(data: $data) {
+    data {
+      id
+      attributes {
+        body
+        createdAt
+        author {
+          data {
+            id
+            attributes {
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+}
+# ---
+fragment ArticleFields on Article {
+  title
+  slug
+  cover {
+    data {
+      attributes {
+        url
+        alternativeText
+      }
+    }
+  }
+}`;
+
+let state = {items:[], done:0};
+
+function splitQueries(raw) {
+  return raw.split(/\n# ---\n|^# ---\n/m).map(q=>q.trim()).filter(Boolean);
+}
+
+function updateCount() {
+  const raw = document.getElementById('inp').value.trim();
+  const n = raw ? splitQueries(raw).length : 0;
+  document.getElementById('qcount').textContent = n===0 ? 'No queries detected' : `${n} quer${n===1?'y':'ies'} detected`;
+  document.getElementById('convbtn').disabled = n===0;
+}
+
+function loadExample() {
+  document.getElementById('inp').value = EXAMPLE;
+  updateCount();
+}
+
+function getName(q) {
+  return q.match(/(?:query|mutation|subscription|fragment)\s+(\w+)/)?.[1] || null;
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderCard(i) {
+  const r = state.items[i];
+  const name = getName(r.v4) || `Query ${i+1}`;
+  const statusIcon = r.ok===true?'✓' : r.ok===false?'✗':'○';
+  const statusColor = r.ok===true?(r.changed?'var(--green)':'var(--blue)') : r.ok===false?'var(--red)':'var(--mt)';
+  const cardClass = r.ok===true?(r.changed?'done':'') : r.ok===false?'err':'';
+
+  const noChange = r.ok===true && !r.changed;
+
+  const copyBtn = r.ok!==undefined ? `<button class="btn-copy1" id="cb${i}" onclick="copySingle(${i})">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    Copy v5
+  </button>` : '';
+
+  const warnTags = (r.warnings||[]).map(w=>`<span class="warn-tag">⚠ ${esc(w)}</span>`).join(' ');
+
+  let v5html = '';
+  if (r.ok===true) {
+    if (!r.changed) {
+      v5html = `<div class="plbl" style="color:var(--blue)">STRAPI v5 (no changes needed)</div><pre style="color:#7090c0">${esc(r.output)}</pre>`;
+    } else {
+      v5html = `<div class="plbl plbl-v5">STRAPI v5</div><pre>${esc(r.output)}</pre>`;
+    }
+  } else if (r.ok===false) {
+    v5html = `<div class="plbl plbl-v5">STRAPI v5</div><div style="color:var(--red);font-size:11px;padding-top:4px;">✗ Parse error: ${esc(r.error||'')}<br><br><span style="color:var(--mt)">The query may use unsupported syntax. Check for typos.</span></div>`;
+  } else {
+    v5html = `<div class="plbl plbl-v5">STRAPI v5</div><div style="color:var(--dm);padding-top:4px">Waiting...</div>`;
+  }
+
+  return `<div class="card ${cardClass}" id="card${i}">
+  <div class="chead">
+    <div class="ctitle">
+      <span class="cstatus" style="color:${statusColor}">${statusIcon}</span>
+      <span class="cname">${esc(name)}</span>
+      ${warnTags}
+    </div>
+    ${copyBtn}
+  </div>
+  <div class="cbody">
+    <div class="cpane pane-v4">
+      <div class="plbl plbl-v4">STRAPI v4</div>
+      <pre>${esc(r.v4)}</pre>
+    </div>
+    <div class="cpane pane-v5">
+      ${v5html}
+    </div>
+  </div>
+</div>`;
+}
+
+function refreshCard(i) {
+  const existing = document.getElementById(`card${i}`);
+  const html = renderCard(i);
+  if (existing) existing.outerHTML = html;
+  else document.getElementById('results').insertAdjacentHTML('beforeend', html);
+}
+
+function updateProgress() {
+  const total = state.items.length, done = state.done;
+  const pct = total>0?(done/total*100):0;
+  const bar = document.getElementById('progbar');
+  bar.style.width = pct+'%';
+  if (done===total&&total>0) bar.classList.add('done');
+  const allGood = state.items.filter(r=>r.ok!==undefined).length;
+  document.getElementById('proglbl').textContent =
+    done===total&&total>0 ? `✓ All ${total} queries processed!` : `Converting… ${done} / ${total}`;
+  if (allGood>0) document.getElementById('copyallbtn').style.display='flex';
+}
+
+function convertAll() {
+  const raw = document.getElementById('inp').value.trim();
+  if (!raw) return;
+  const queries = splitQueries(raw);
+  state = { items: queries.map(v4=>({v4})), done:0 };
+
+  // Show progress
+  const pw = document.getElementById('progwrap');
+  pw.style.display='block';
+  document.getElementById('progbar').style.width='0%';
+  document.getElementById('progbar').classList.remove('done');
+  document.getElementById('copyallbtn').style.display='none';
+  document.getElementById('convbtn').disabled=true;
+
+  document.getElementById('results').innerHTML = state.items.map((_,i)=>renderCard(i)).join('');
+
+  // Convert synchronously (fast — no API call needed)
+  for (let i=0; i<queries.length; i++) {
+    const res = convertGQL(queries[i]);
+    state.items[i] = {
+      v4: queries[i],
+      ok: res.ok,
+      output: res.output,
+      changed: res.changed,
+      warnings: res.warnings||[],
+      error: res.error
+    };
+    state.done++;
+    updateProgress();
+    refreshCard(i);
+  }
+
+  document.getElementById('convbtn').disabled=false;
+}
+
+function copySingle(i) {
+  const r = state.items[i];
+  if (!r||r.ok===undefined) return;
+  const text = r.ok ? r.output : r.v4;
+  navigator.clipboard.writeText(text);
+  const btn = document.getElementById(`cb${i}`);
+  if (btn) {
+    const orig = btn.innerHTML;
+    btn.textContent='✓ Copied!'; btn.classList.add('ok');
+    setTimeout(()=>{ btn.innerHTML=orig; btn.classList.remove('ok'); }, 1500);
+  }
+}
+
+function copyAll() {
+  const all = state.items
+    .filter(r => r.ok===true)
+    .map(r => r.output)
+    .join('\n\n# ---\n\n');
+  navigator.clipboard.writeText(all);
+  const btn = document.getElementById('copyallbtn');
+  btn.textContent='✓ Copied!'; btn.classList.add('ok');
+  setTimeout(()=>{ btn.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy All v5`; btn.classList.remove('ok'); }, 2000);
+}
+</script>
+</body>
+</html>
